@@ -10,9 +10,6 @@ from shutil import get_terminal_size
 from typing import Optional, Iterable
 import aiohttp
 
-# ---------------------------
-# UI / Helpers
-# ---------------------------
 
 SPINNER = cycle(["/", "-", "\\", "|"])
 
@@ -48,12 +45,18 @@ async def fetch_public_ip() -> str:
 
 def confirm(prompt: str) -> bool:
     answer = input(f"{prompt} [y/N]: ").strip().lower()
-    return answer in {"y", "yes"}
-
-
-# ---------------------------
-# EC2
-# ---------------------------
+    return answer in {
+        "y",
+        "yes",
+        "yeah",
+        "yep",
+        "ah",
+        "oui",
+        "na3am",
+        "tl9na",
+        "tle9na",
+        "sudo",
+    }
 
 
 class EC2Service:
@@ -99,11 +102,6 @@ class EC2Service:
         return matches
 
 
-# ---------------------------
-# Security Groups
-# ---------------------------
-
-
 class SecurityGroupService:
     @staticmethod
     async def list_rules() -> list[dict]:
@@ -112,11 +110,6 @@ class SecurityGroupService:
             "Loading security group rules",
         )
         return loads(raw)["SecurityGroupRules"]
-
-
-# ---------------------------
-# SSH Rule Logic
-# ---------------------------
 
 
 class SSHRuleUpdater:
@@ -167,11 +160,6 @@ class SSHRuleUpdater:
             print(f"  Updated → {self.source_cidr}")
 
 
-# ---------------------------
-# CLI
-# ---------------------------
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Update EC2 SSH security group source IP"
@@ -194,8 +182,8 @@ async def main():
     )
 
     if not args.instance_id and not args.instance_name:
-        print(f"⚠️  No instance filter provided.")
-        print(f"⚠️  This will update SSH rules on {len(targets)} instances.")
+        print(f" No instance filter provided.")
+        print(f"This will update SSH rules on {len(targets)} instances.")
         if not confirm("Continue?"):
             print("Aborted.")
             return
@@ -207,8 +195,7 @@ async def main():
 
     for instance in targets:
         print(
-            f"Instance: {instance['InstanceId']} "
-            f"({EC2Service.instance_name(instance)})"
+            f"Instance: {instance['InstanceId']} ({EC2Service.instance_name(instance)})"
         )
 
         updater = SSHRuleUpdater(
