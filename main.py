@@ -43,22 +43,6 @@ async def fetch_public_ip() -> str:
             return (await resp.json())["ip"]
 
 
-def confirm(prompt: str) -> bool:
-    answer = input(f"{prompt} [y/N]: ").strip().lower()
-    return answer in {
-        "y",
-        "yes",
-        "yeah",
-        "yep",
-        "ah",
-        "oui",
-        "na3am",
-        "tl9na",
-        "tle9na",
-        "sudo",
-    }
-
-
 class EC2Service:
     @staticmethod
     async def list_instances() -> list[dict]:
@@ -161,13 +145,49 @@ class SSHRuleUpdater:
 
 
 def parse_args() -> argparse.Namespace:
+    __VERSION = "AWS-ACCESS-RENEWER 1.0.2"
     parser = argparse.ArgumentParser(
-        description="Update EC2 SSH security group source IP"
+        description="""
+Automatically update AWS EC2 security group SSH rules to allow access from your current IP address.
+If no instance is specified, lists all instances and prompts for confirmation to update all.
+        """.strip(
+            "\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Example: python main.py -n my-instance --ssh-port 2222",
+        prog="aws-access-renewer",
+        usage="%(prog)s [options]",
     )
-    parser.add_argument("-i", "--instance-id")
-    parser.add_argument("-n", "--instance-name")
-    parser.add_argument("-p", "--ssh-port", type=int, default=22)
-    parser.add_argument("--source-ip", help="IP or CIDR (auto-detected if omitted)")
+    parser.add_argument(
+        "-i", "--instance-id", help="EC2 instance ID", dest="instance_id"
+    )
+    parser.add_argument(
+        "-n", "--instance-name", help="EC2 instance Name tag", dest="instance_name"
+    )
+    parser.add_argument(
+        "-p",
+        "--ssh-port",
+        type=int,
+        default=22,
+        help="SSH port to update (default: 22)",
+        dest="ssh_port",
+    )
+    parser.add_argument(
+        "--source-ip", help="IP or CIDR (auto-detected if omitted)", dest="source_ip"
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=__VERSION,
+        help="Show program version and exit",
+    )
+    parser.add_argument(
+        "-b",
+        "--batch",
+        action="store_true",
+        help="Run in batch mode without prompts",
+        default=False,
+    )
     return parser.parse_args()
 
 
@@ -188,21 +208,24 @@ async def main():
             print(f"  {instance['InstanceId']} ({name})")
         print()
 
-        if (
-            add_input := input(
-                "Enter 'all' to proceed with all instances, instance ID to proceed with that instance, or anything else to abort: "
-            )
-            .strip()
-            .lower()
-        ) == "all":
-            pass
-        elif any(instance["InstanceId"] == add_input for instance in targets):
-            targets = [
-                instance for instance in targets if instance["InstanceId"] == add_input
-            ]
-        else:
-            print("Aborted.")
-            return
+        if not args.batch:
+            if (
+                add_input := input(
+                    "Enter 'all' to proceed with all instances, instance ID to proceed with that instance, or anything else to abort: "
+                )
+                .strip()
+                .lower()
+            ) == "all":
+                pass
+            elif any(instance["InstanceId"] == add_input for instance in targets):
+                targets = [
+                    instance
+                    for instance in targets
+                    if instance["InstanceId"] == add_input
+                ]
+            else:
+                print("Aborted.")
+                return
 
     source_ip = args.source_ip or await fetch_public_ip()
     print(f"Using source IP: {source_ip}\n")
