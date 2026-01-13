@@ -182,9 +182,25 @@ async def main():
     )
 
     if not args.instance_id and not args.instance_name:
-        print(f" No instance filter provided.")
-        print(f"This will update SSH rules on {len(targets)} instances.")
-        if not confirm("Continue?"):
+        print("Instances:")
+        for instance in targets:
+            name = EC2Service.instance_name(instance)
+            print(f"  {instance['InstanceId']} ({name})")
+        print()
+
+        if (
+            add_input := input(
+                "Enter 'all' to proceed with all instances, instance ID to proceed with that instance, or anything else to abort: "
+            )
+            .strip()
+            .lower()
+        ) == "all":
+            pass
+        elif any(instance["InstanceId"] == add_input for instance in targets):
+            targets = [
+                instance for instance in targets if instance["InstanceId"] == add_input
+            ]
+        else:
             print("Aborted.")
             return
 
