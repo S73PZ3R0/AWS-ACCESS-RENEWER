@@ -75,32 +75,34 @@ class OrchestratorUI:
             lines.append(line)
         return Panel(Group(*lines), title="[bold info] PROCESS_MONITOR [/]", border_style="cyber.border", expand=False)
 
-    async def interactive_select(self, instances: list):
-        """Custom keyboard-driven selector using Rich and Live."""
-        selected_indices = {i for i in range(len(instances))}
+    async def interactive_multiselect(self, items: list, item_type: str = "RESOURCE"):
+        """Custom keyboard-driven multiselector using Rich and Live."""
+        selected_indices = {i for i in range(len(items))}
         cursor_index = 0
         
         def render():
             table = Table.grid(padding=(0, 2))
             table.add_column("State", justify="center", width=4)
-            table.add_column("Resource")
+            table.add_column("Item")
             
-            for idx, inst in enumerate(instances):
+            for idx, item in enumerate(items):
                 is_selected = idx in selected_indices
                 is_cursor = idx == cursor_index
                 
                 check = "[bold #00FFFF]●[/]" if is_selected else "[dim]○[/]"
-                name = inst.get("Tags", [{"Key": "Name", "Value": "N/A"}])[0]["Value"]
-                for tag in inst.get("Tags", []):
-                    if tag["Key"] == "Name":
-                        name = tag["Value"]
-                        break
                 
-                # Highlight logic
-                label = Text.assemble(
-                    (f"{inst['InstanceId']} ", "aws.id"),
-                    (f"({name})", "dim")
-                )
+                if item_type == "RESOURCE":
+                    name = item.get("Tags", [{"Key": "Name", "Value": "N/A"}])[0]["Value"]
+                    for tag in item.get("Tags", []):
+                        if tag["Key"] == "Name":
+                            name = tag["Value"]
+                            break
+                    label = Text.assemble(
+                        (f"{item['InstanceId']} ", "aws.id"),
+                        (f"({name})", "dim")
+                    )
+                else: # PORT
+                    label = Text(f"PORT {item}", style="white")
                 
                 if is_cursor:
                     row_content = Text.assemble(("» ", "info"), label)
@@ -110,18 +112,17 @@ class OrchestratorUI:
             
             return Panel.fit(
                 table, 
-                title="[bold info] TARGET_SELECTION [/]", 
+                title=f"[bold info] {item_type}_SELECTION [/]", 
                 subtitle="[dim] SPACE:Toggle | ENTER:Confirm [/]", 
                 border_style="cyber.border",
                 padding=(1, 2)
             )
 
-        # Using the instance console to ensure theme consistency
         with Live(render(), console=self.console, refresh_per_second=20, auto_refresh=False) as live:
             fd = sys.stdin.fileno()
             old_settings = termios.tcgetattr(fd)
             try:
-                tty.setcbreak(fd) # setcbreak instead of setraw to preserve CRLF
+                tty.setcbreak(fd)
                 while True:
                     live.update(render())
                     live.refresh()
@@ -139,15 +140,15 @@ class OrchestratorUI:
                         if next_char == '[':
                             arrow = sys.stdin.read(1)
                             if arrow == 'A': # Up
-                                cursor_index = (cursor_index - 1) % len(instances)
+                                cursor_index = (cursor_index - 1) % len(items)
                             elif arrow == 'B': # Down
-                                cursor_index = (cursor_index + 1) % len(instances)
+                                cursor_index = (cursor_index + 1) % len(items)
                     elif char == '\x03': # Ctrl+C
                         raise KeyboardInterrupt()
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         
-        return [instances[i] for i in selected_indices]
+        return [items[i] for i in selected_indices]
 
     def show_summary(self, stats: dict):
         console.print("\n[dim]──────────────────────────────────────────────────[/]")

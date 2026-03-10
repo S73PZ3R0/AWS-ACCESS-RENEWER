@@ -15,7 +15,8 @@ A high-performance asynchronous Python utility to automatically update AWS EC2 s
 - **Auto IP Detection**: Automatically fetches your current public IPv4/IPv6 address.
 - **Asynchronous Execution**: Uses `asyncio` and `aiohttp` for non-blocking operations.
 - **Target Filtering**: Update rules by Instance ID, Name tag, or across all instances.
-- **Port Flexibility**: Support for default (22) or custom SSH ports.
+- **Multi-Port Support**: Sync multiple ports simultaneously (e.g., SSH, HTTPs, custom apps).
+- **Interactive Port Selection**: Discovers and targets active ingress rules automatically.
 - **Batch Mode**: Non-interactive execution suitable for automated workflows or cron jobs.
 - **Safety First**: Structured exception handling and clear error reporting.
 
@@ -58,8 +59,8 @@ python main.py -i i-0123456789abcdef0
 
 ### Advanced Options
 ```bash
-# Specify a custom SSH port
-python main.py -p 2222
+# Multiple ports (comma-separated)
+python main.py -p 22,443,8080
 
 # Provide a specific source IP/CIDR manually
 python main.py --source-ip 1.2.3.4

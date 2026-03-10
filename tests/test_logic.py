@@ -26,16 +26,30 @@ class TestLogic(unittest.TestCase):
             "InstanceId": "i-123",
             "SecurityGroups": [{"GroupId": "sg-1"}]
         }
-        updater = SSHRuleUpdater(instance, 22, "1.1.1.1")
+        updater = SSHRuleUpdater(instance, [22, 443], "1.1.1.1")
         
-        matching_rule = {
+        matching_rule_22 = {
             "GroupId": "sg-1",
             "IsEgress": False,
             "IpProtocol": "tcp",
             "FromPort": 22,
             "ToPort": 22
         }
-        non_matching_rule = {
+        matching_rule_443 = {
+            "GroupId": "sg-1",
+            "IsEgress": False,
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443
+        }
+        non_matching_port = {
+            "GroupId": "sg-1",
+            "IsEgress": False,
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80
+        }
+        non_matching_sg = {
             "GroupId": "sg-2",
             "IsEgress": False,
             "IpProtocol": "tcp",
@@ -43,8 +57,10 @@ class TestLogic(unittest.TestCase):
             "ToPort": 22
         }
         
-        self.assertTrue(updater._is_matching_ssh_rule(matching_rule))
-        self.assertFalse(updater._is_matching_ssh_rule(non_matching_rule))
+        self.assertTrue(updater._is_matching_ssh_rule(matching_rule_22))
+        self.assertTrue(updater._is_matching_ssh_rule(matching_rule_443))
+        self.assertFalse(updater._is_matching_ssh_rule(non_matching_port))
+        self.assertFalse(updater._is_matching_ssh_rule(non_matching_sg))
 
 if __name__ == "__main__":
     unittest.main()

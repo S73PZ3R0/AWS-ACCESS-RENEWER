@@ -62,12 +62,37 @@ async def main():
         # 3. Interactive Selection
         if args.batch:
             selected = all_instances
+            ports = [int(p.strip()) for p in args.ssh_port.split(",")] if args.ssh_port else [22]
         else:
-            selected = await ui.interactive_select(all_instances)
+            selected = await ui.interactive_multiselect(all_instances, item_type="RESOURCE")
             
             if not selected:
                 ui.console.print("\n[warning]  ABORTED: NO_RESOURCES_SELECTED [/]\n")
                 return
+
+            if args.ssh_port:
+                ports = [int(p.strip()) for p in args.ssh_port.split(",")]
+            else:
+                # Discover ports from selected instances' security groups
+                with ui.console.status("[info]DISCOVERING_PORTS...[/]"):
+                    discovered_ports = set()
+                    for inst in selected:
+                        sg_service = SecurityGroupService(args.profile, inst["_region"])
+                        rules = await sg_service.list_rules()
+                        sg_ids = {sg["GroupId"] for sg in inst["SecurityGroups"]}
+                        for r in rules:
+                            if (r["GroupId"] in sg_ids and not r["IsEgress"] and 
+                                r["IpProtocol"] == "tcp" and "FromPort" in r):
+                                discovered_ports.add(r["FromPort"])
+                
+                if not discovered_ports:
+                    discovered_ports = {22} # Default to 22 if none found
+                
+                ports = await ui.interactive_multiselect(sorted(list(discovered_ports)), item_type="PORT")
+                
+                if not ports:
+                    ui.console.print("\n[warning]  ABORTED: NO_PORTS_SELECTED [/]\n")
+                    return
 
         # 4. Orchestrated Execution
         ui.console.print("[bold info]  EXECUTION_START [/]")
@@ -90,7 +115,7 @@ async def main():
                 try:
                     region = inst["_region"]
                     updater = SSHRuleUpdater(
-                        inst, args.ssh_port, src_ip, args.profile, region, 
+                        inst, ports, src_ip, args.profile, region, 
                         args.dry_run, args.cleanup
                     )
                     sg_service = SecurityGroupService(args.profile, region)

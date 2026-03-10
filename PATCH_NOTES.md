@@ -1,5 +1,18 @@
 # Patch Notes
 
+## [1.7.0] - 2026-03-10
+
+### Added
+- **Multi-Port Support**: Users can now specify multiple comma-separated ports via the CLI (e.g., `-p 22,80,443`).
+- **Interactive Port Discovery**: The TUI now automatically identifies existing TCP ingress rules for selected instances and presents an interactive port selection menu.
+- **Generic Multiselect TUI**: Refactored the interactive selection component to be modular and reusable for different resource types.
+
+### Changed
+- **Version Bump**: Updated application version to 1.7.0.
+- **CLI Argument Refinement**: The `--ssh-port` argument now accepts strings for list parsing instead of a single integer.
+- **UI UX Improvements**: Enhanced the target selection flow with a dedicated port confirmation step.
+
+
 ## [1.1.0] - 2026-03-09
 
 ### Added
