@@ -1,12 +1,13 @@
 [project]
 name = "aws-access-renewer"
-version = "1.7.0"
+version = "1.8.0"
 description = "Asynchronous utility to automatically update AWS EC2 Security Group SSH rules with the current public IP."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.13.3",
     "rich>=13.7.0",
+    "questionary>=2.0.1",
 ]
 
 [project.scripts]

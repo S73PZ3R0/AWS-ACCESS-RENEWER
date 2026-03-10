@@ -10,11 +10,13 @@ import sys
 import tty
 import termios
 import asyncio
+import questionary
+
 
 console = Console(theme=CYBER_STEALTH)
 
 class OrchestratorUI:
-    def __init__(self, version: str = "1.7.0"):
+    def __init__(self, version: str = "1.8.0"):
         self.version = version
         self.console = console
 
@@ -150,7 +152,35 @@ class OrchestratorUI:
         
         return [items[i] for i in selected_indices]
 
+    async def prompt_for_credentials(self) -> dict:
+        """Interactive prompt for AWS credentials when auth fails."""
+        self.console.print("\n[bold danger]  AUTHENTICATION_REQUIRED [/]")
+        self.console.print("[dim]Your AWS credentials are missing or invalid.[/]\n")
+        
+        creds = {}
+        creds['aws_access_key_id'] = await questionary.text(
+            "AWS Access Key ID:",
+            validate=lambda x: True if len(x) > 0 else "Cannot be empty"
+        ).ask_async()
+        
+        if not creds['aws_access_key_id']: return None
+
+        creds['aws_secret_access_key'] = await questionary.password(
+            "AWS Secret Access Key:",
+            validate=lambda x: True if len(x) > 0 else "Cannot be empty"
+        ).ask_async()
+
+        if not creds['aws_secret_access_key']: return None
+
+        creds['region'] = await questionary.text(
+            "Default Region (e.g. us-east-1):",
+            default="us-east-1"
+        ).ask_async()
+
+        return creds
+
     def show_summary(self, stats: dict):
+
         console.print("\n[dim]──────────────────────────────────────────────────[/]")
         summary_table = Table.grid(padding=(0, 1))
         summary_table.add_row(

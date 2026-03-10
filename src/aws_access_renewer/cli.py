@@ -16,5 +16,5 @@ def parse_args():
     parser.add_argument("-d", "--dry-run", action="store_true", help="Preview changes without applying them")
     parser.add_argument("--cleanup", action="store_true", help="Remove redundant rules instead of updating them")
     parser.add_argument("-b", "--batch", action="store_true", help="No interactive prompts")
-    parser.add_argument("--version", action="version", version="AWS-ACCESS-RENEWER 1.7.0")
+    parser.add_argument("--version", action="version", version="AWS-ACCESS-RENEWER 1.8.0")
     return parser.parse_args()

@@ -3,6 +3,14 @@ from asyncio.subprocess import PIPE
 from json import loads
 from typing import Optional, List
 
+class AWSAuthError(RuntimeError):
+    """Raised when AWS authentication fails."""
+    pass
+
+class AWSConfigError(RuntimeError):
+    """Raised when AWS configuration is missing (e.g. region)."""
+    pass
+
 async def run_cmd(cmd: str, profile: Optional[str] = None, region: Optional[str] = None) -> str:
     full_cmd = "aws "
     if profile: full_cmd += f"--profile {profile} "
@@ -14,7 +22,15 @@ async def run_cmd(cmd: str, profile: Optional[str] = None, region: Optional[str]
     
     if process.returncode != 0:
         err = stderr.decode().strip()
-        if "InvalidPermission.Duplicate" in err: return "ALREADY_EXISTS"
+        if "InvalidPermission.Duplicate" in err: 
+            return "ALREADY_EXISTS"
+        
+        if any(token in err for token in ["AuthFailure", "InvalidClientTokenId", "SignatureDoesNotMatch", "ExpiredToken"]):
+            raise AWSAuthError(err)
+        
+        if "You must specify a region" in err:
+            raise AWSConfigError(err)
+            
         raise RuntimeError(err)
     return stdout.decode()
 
