@@ -11,12 +11,12 @@ import tty
 import termios
 import asyncio
 import questionary
-
+from ..core.constants import VERSION, DEFAULT_REGION
 
 console = Console(theme=CYBER_STEALTH)
 
 class OrchestratorUI:
-    def __init__(self, version: str = "1.8.0"):
+    def __init__(self, version: str = VERSION):
         self.version = version
         self.console = console
 
@@ -174,13 +174,12 @@ class OrchestratorUI:
 
         creds['region'] = await questionary.text(
             "Default Region (e.g. us-east-1):",
-            default="us-east-1"
+            default=DEFAULT_REGION
         ).ask_async()
 
         return creds
 
     def show_summary(self, stats: dict):
-
         console.print("\n[dim]──────────────────────────────────────────────────[/]")
         summary_table = Table.grid(padding=(0, 1))
         summary_table.add_row(

@@ -1,6 +1,16 @@
 # Patch Notes
 
+## [1.8.1] - 2026-03-10
+
+### Added
+- **Customizable Rule Descriptions**: Added a new `--rule-description` flag to allow users to override the default text added to AWS security group rules.
+
+### Changed
+- **Centralized Constants**: Refactored the codebase to move all hardcoded defaults (Version, IP API, Managed Description, Default Region) into a dedicated `core/constants.py` module for better maintainability.
+- **Architectural Cleanup**: Removed leftover UI test files and standardized modular imports across all components.
+
 ## [1.8.0] - 2026-03-10
+
 
 ### Added
 - **Surgical Login Interface**: Implemented an automated fallback UI that triggers when AWS authentication fails or configuration is missing.

@@ -2,17 +2,18 @@ from json import dumps
 from typing import Dict, Any, Optional
 from .aws import run_cmd
 from .network import normalize_ip
+from .constants import DEFAULT_MANAGED_DESCRIPTION
 
 class SSHRuleUpdater:
-    MANAGED_DESCRIPTION = "Auto-updated by aws-access-renewer"
-    
     def __init__(self, instance: dict, ports: list[int], source_ip: str, 
                  profile: Optional[str] = None, region: Optional[str] = None,
-                 dry_run: bool = False, cleanup: bool = False):
+                 dry_run: bool = False, cleanup: bool = False,
+                 rule_description: str = DEFAULT_MANAGED_DESCRIPTION):
         self.instance, self.ports = instance, ports
         self.source_cidr = normalize_ip(source_ip)
         self.sg_ids = {sg["GroupId"] for sg in instance["SecurityGroups"]}
         self.profile, self.region, self.dry_run, self.cleanup = profile, region, dry_run, cleanup
+        self.rule_description = rule_description
 
     def _is_matching_ssh_rule(self, rule: dict) -> bool:
         return (rule["GroupId"] in self.sg_ids and not rule["IsEgress"] and 
@@ -45,7 +46,7 @@ class SSHRuleUpdater:
 
             payload = [{"SecurityGroupRuleId": rule["SecurityGroupRuleId"], "SecurityGroupRule": {
                 "IpProtocol": "tcp", "FromPort": rule["FromPort"], "ToPort": rule["ToPort"],
-                "CidrIpv4": self.source_cidr, "Description": self.MANAGED_DESCRIPTION}}]
+                "CidrIpv4": self.source_cidr, "Description": self.rule_description}}]
             
             res = await run_cmd(f"ec2 modify-security-group-rules --group-id {rule['GroupId']} --security-group-rules '{dumps(payload)}'", self.profile, self.region)
             if res == "ALREADY_EXISTS": results["skipped"] += 1

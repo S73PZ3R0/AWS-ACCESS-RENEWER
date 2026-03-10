@@ -11,6 +11,7 @@ if os.path.exists(src_path):
     sys.path.insert(0, src_path)
 
 from aws_access_renewer.cli import parse_args
+from aws_access_renewer.core.constants import VERSION
 from aws_access_renewer.core.network import fetch_public_ip
 from aws_access_renewer.core.aws import EC2Service, SecurityGroupService, AWSAuthError, AWSConfigError
 from aws_access_renewer.core.updater import SSHRuleUpdater
@@ -132,7 +133,11 @@ async def run_orchestrator(args, ui):
 
                 try:
                     region = inst["_region"]
-                    updater = SSHRuleUpdater(inst, ports, src_ip, args.profile, region, args.dry_run, args.cleanup)
+                    updater = SSHRuleUpdater(
+                        inst, ports, src_ip, args.profile, region, 
+                        args.dry_run, args.cleanup,
+                        rule_description=args.rule_description
+                    )
                     sg_service = SecurityGroupService(args.profile, region)
                     rules = await sg_service.list_rules()
                     res = await updater.update(rules)
@@ -185,7 +190,7 @@ async def run_orchestrator(args, ui):
 
 async def main_async():
     args = parse_args()
-    ui = OrchestratorUI(version="1.8.0")
+    ui = OrchestratorUI(version=VERSION)
     
     if not args.batch:
         ui.show_header()
