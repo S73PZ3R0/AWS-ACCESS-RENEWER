@@ -1,86 +1,84 @@
-# AWS-ACCESS-RENEWER
+# ⚡ AWS-ACCESS-RENEWER ⚡
 
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.8.0-gold.svg)](PATCH_NOTES.md)
 
-A high-performance asynchronous Python utility to automatically update AWS EC2 security group SSH ingress rules. It detects your current public IP address and synchronizes your AWS access rules to ensure uninterrupted connectivity.
+**A high-fidelity, asynchronous DevOps utility to automatically synchronize AWS EC2 security group rules with your current public IP address.**
 
-## Features
+Built for professional terminal environments, featuring a modern "Orchestrator" UI, automated authentication fallback, and headless JSON output for CI/CD automation.
 
-- **Multi-Region Support**: Scan and update rules across multiple AWS regions simultaneously.
-- **Dry-Run Mode**: Preview changes without applying them using the `--dry-run` flag.
-- **AWS Profile Support**: Specify custom AWS CLI profiles with the `--profile` flag.
-- **Stale Rule Cleanup**: Remove old SSH access rules from other IPs using the `--cleanup` flag.
-- **Rule Descriptions**: Automatically adds descriptions to managed rules for easier identification.
-- **Auto IP Detection**: Automatically fetches your current public IPv4/IPv6 address.
-- **Asynchronous Execution**: Uses `asyncio` and `aiohttp` for non-blocking operations.
-- **Target Filtering**: Update rules by Instance ID, Name tag, or across all instances.
-- **Multi-Port Support**: Sync multiple ports simultaneously (e.g., SSH, HTTPs, custom apps).
-- **Interactive Port Selection**: Discovers and targets active ingress rules automatically.
-- **Batch Mode**: Non-interactive execution suitable for automated workflows or cron jobs.
-- **Safety First**: Structured exception handling and clear error reporting.
+---
 
-## Prerequisites
+## 🚀 Installation (System-Wide)
 
-- **Python**: 3.12 or higher.
-- **AWS CLI**: Installed and configured with valid credentials (`aws configure`).
-- **Permissions**: IAM user must have permissions to `ec2:DescribeInstances`, `ec2:DescribeSecurityGroupRules`, and `ec2:ModifySecurityGroupRules`.
-
-## Installation
-
-This project uses `uv` for lightning-fast dependency management.
+To use the `aws-access-renewer` command from **anywhere** on your system, install it using `uv tool`. This is the recommended method.
 
 ```bash
-# Clone the repository
-git clone https://github.com/youruser/aws-access-renewer.git
-cd aws-access-renewer
+# 1. Install via uv (Automatic packaging and linking)
+uv tool install git+https://github.com/S73PZ3R0/AWS-ACCESS-RENEWER.git
 
-# Install dependencies
+# OR from local source
+uv tool install . --force
+```
+
+*The binary will be linked to your path (typically `~/.local/bin/aws-access-renewer`).*
+
+---
+
+## 🛠 Usage
+
+Once installed, simply type the command from any directory:
+
+### 1. Interactive Orchestrator (Default)
+Launch the full UI to discover resources, select targets via keyboard, and monitor real-time synchronization.
+```bash
+aws-access-renewer
+```
+
+### 2. Automation (Headless Batch Mode)
+Suppresses all UI elements and returns a structured **JSON** response. Ideal for cron jobs, scripts, and CI/CD pipelines.
+```bash
+aws-access-renewer --batch --cleanup
+```
+
+### 3. Advanced Commands
+```bash
+# Update specific region with Dry-Run (No changes made)
+aws-access-renewer --regions us-east-1 --dry-run
+
+# Target a specific instance and multiple ports
+aws-access-renewer -n "prod-api" -p 22,80,443
+
+# Use a specific AWS Profile
+aws-access-renewer --profile staging
+```
+
+---
+
+## 🔐 Key Features
+
+- **Modern Orchestrator UI**: Scrolling high-signal CLI flow with hierarchical resource trees.
+- **Surgical Login Interface**: Automated fallback UI that securely prompts for credentials only when AWS authentication fails.
+- **Headless JSON Output**: Pure data output in batch mode for professional tool-chaining.
+- **Smart Conflict Handling**: Proactively detects existing rules to avoid AWS `DuplicatePermission` errors.
+- **Multi-Region Support**: Synchronize rules across the entire AWS global infrastructure in one pass.
+
+---
+
+## 🧪 Development
+
+If you wish to contribute or modify the source:
+
+```bash
+# Clone and sync local virtual environment
+git clone https://github.com/S73PZ3R0/AWS-ACCESS-RENEWER.git
+cd AWS-ACCESS-RENEWER
 uv sync
+
+# Run tests
+uv run python -m unittest tests/test_logic.py
 ```
 
-## Usage
-
-### Interactive Mode
-Lists all instances and prompts for confirmation before making changes.
-```bash
-python main.py
-```
-
-### Targeted Updates
-Update a specific instance by name or ID.
-```bash
-# By Name tag
-python main.py -n "prod-web-server"
-
-# By Instance ID
-python main.py -i i-0123456789abcdef0
-```
-
-### Advanced Options
-```bash
-# Multiple ports (comma-separated)
-python main.py -p 22,443,8080
-
-# Provide a specific source IP/CIDR manually
-python main.py --source-ip 1.2.3.4
-
-# Batch mode (non-interactive, updates all matches)
-python main.py -b
-```
-
-## Development
-
-### Running Tests
-The project uses the standard `unittest` framework for core logic validation.
-```bash
-python3 -m unittest tests/test_logic.py
-```
-
-### Project Structure
-- `main.py`: Core application entry point and CLI logic.
-- `tests/`: Unit tests for critical functions.
-- `pyproject.toml`: Dependency and metadata configuration.
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## 📜 License
+Licensed under the MIT License. See [LICENSE](LICENSE) for details.
