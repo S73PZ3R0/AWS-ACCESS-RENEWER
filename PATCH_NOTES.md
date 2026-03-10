@@ -3,27 +3,20 @@
 ## [1.7.0] - 2026-03-10
 
 ### Added
-- **Multi-Port Support**: Users can now specify multiple comma-separated ports via the CLI (e.g., `-p 22,80,443`).
-- **Interactive Port Discovery**: The TUI now automatically identifies existing TCP ingress rules for selected instances and presents an interactive port selection menu.
-- **Generic Multiselect TUI**: Refactored the interactive selection component to be modular and reusable for different resource types.
+- **Modern Orchestrator UI**: Completely redesigned the CLI experience with a high-fidelity, scrolling flow.
+- **Hierarchical Discovery**: Added a dynamic tree view for AWS resources grouped by region.
+- **Interactive Multiselection**: Implemented a custom keyboard-driven multiselector for both EC2 instances and ports.
+- **Port Discovery**: Added automatic detection of open ingress ports from security groups during the interactive flow.
+- **Modular Architecture**: Refactored the core logic into a professional package structure (`src/aws_access_renewer/`).
+- **Global Installation Support**: Added `[project.scripts]` entry point and package restructuring for system-wide use via `uv tool install`.
+- **Git Integration**: Added a comprehensive `.gitignore` file to protect the repository from temporary files and virtual environments.
 
 ### Changed
-- **Version Bump**: Updated application version to 1.7.0.
-- **CLI Argument Refinement**: The `--ssh-port` argument now accepts strings for list parsing instead of a single integer.
-- **UI UX Improvements**: Enhanced the target selection flow with a dedicated port confirmation step.
+- **Entry Point**: Moved `main.py` to `src/aws_access_renewer/__main__.py` to support standard Python packaging.
+- **Execution Flow**: Optimized the main loop for smoother transitions between discovery, selection, and execution phases.
+- **Theming**: Standardized the "Terminal Classic" (Gold/Amber) aesthetic across all UI components.
 
-
-## [1.1.0] - 2026-03-09
-
-### Added
-- **AWS API Pagination**: Implemented `NextToken` handling in `EC2Service.list_instances` and `SecurityGroupService.list_rules`. This ensures all resources are retrieved in large AWS environments.
-- **Structured Exception Handling**: Refined the main execution loop to catch specific errors (`aiohttp.ClientError`, `json.JSONDecodeError`, `ValueError`) with clear messaging, while maintaining a broad fallback for unexpected critical failures.
-- **Unit Testing Suite**: Added `tests/test_logic.py` to verify core IP normalization and instance tagging logic using the `unittest` framework.
-- **Graceful Termination**: Added explicit handling for `EOFError` during interactive input and improved `KeyboardInterrupt` cleanup.
-
-### Changed
-- **Project Renaming**: Unified the project name to `aws-access-renewer` across `pyproject.toml`, `README.md`, and the CLI's internal version string.
-- **Version Bump**: Updated version from `1.0.2` (legacy internal) / `0.1.0` (legacy meta) to `1.1.0`.
-- **IP Normalization**: Enhanced safety in `normalize_ip` to better handle malformed input strings.
-- **Documentation**: Completely overhauled `README.md` and created `GEMINI.md` for AI-assisted development context.
-
+### Fixed
+- **Module Resolution**: Resolved `ModuleNotFoundError` during global installation by correctly structuring the source code.
+- **Event Loop Conflict**: Fixed `asyncio.run()` errors when running the tool in environments with existing loops.
+- **Duplicate Permission Handling**: Improved logic to gracefully skip or handle existing AWS security group rules.

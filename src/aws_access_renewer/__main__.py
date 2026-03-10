@@ -1,12 +1,7 @@
 #!/usr/bin/env python3
-import sys
-import os
 import asyncio
+import sys
 from rich.live import Live
-from rich.console import Console
-
-# Adjust path for internal modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from aws_access_renewer.cli import parse_args
 from aws_access_renewer.core.network import fetch_public_ip
@@ -14,7 +9,7 @@ from aws_access_renewer.core.aws import EC2Service, SecurityGroupService
 from aws_access_renewer.core.updater import SSHRuleUpdater
 from aws_access_renewer.ui.orchestrator import OrchestratorUI
 
-async def main():
+async def main_async():
     args = parse_args()
     ui = OrchestratorUI(version="1.7.0")
     
@@ -148,17 +143,12 @@ async def main():
         ui.console.print(f"\n[bold danger]FATAL ERROR:[/] {e}")
         sys.exit(1)
 
-if __name__ == "__main__":
+def main():
     try:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            loop = None
-
-        if loop and loop.is_running():
-            asyncio.ensure_future(main())
-        else:
-            asyncio.run(main())
+        asyncio.run(main_async())
     except KeyboardInterrupt:
         print("\n[warning]Operation cancelled.[/]")
         sys.exit(130)
+
+if __name__ == "__main__":
+    main()

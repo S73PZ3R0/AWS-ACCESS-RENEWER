@@ -8,3 +8,7 @@ dependencies = [
     "aiohttp>=3.13.3",
     "rich>=13.7.0",
 ]
+
+[project.scripts]
+aws-access-renewer = "aws_access_renewer.__main__:main"
+
