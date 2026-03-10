@@ -1,255 +1,139 @@
 #!/usr/bin/env python3
-import asyncio
-import argparse
 import sys
-import ipaddress
-from asyncio.subprocess import PIPE
-from itertools import cycle
-from json import loads, dumps
-from shutil import get_terminal_size
-from typing import Optional, Iterable
-import aiohttp
+import os
+import asyncio
+from rich.live import Live
+from rich.console import Console
 
+# Adjust path for internal modules
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
-SPINNER = cycle(["/", "-", "\\", "|"])
-
-
-async def run_cmd(cmd: str, label: str) -> str:
-    process = await asyncio.create_subprocess_shell(cmd, stdout=PIPE, stderr=PIPE)
-
-    while process.returncode is None:
-        print(f"\r{label} {next(SPINNER)}", end="", flush=True)
-        await asyncio.sleep(0.1)
-
-    print(f"\r{' ' * get_terminal_size().columns}", end="", flush=True)
-
-    stdout, stderr = await process.communicate()
-    if process.returncode != 0:
-        raise RuntimeError(stderr.decode().strip())
-
-    return stdout.decode()
-
-
-def normalize_ip(value: str) -> str:
-    if "/" in value:
-        return value
-    ip = ipaddress.ip_address(value)
-    return f"{value}/32" if ip.version == 4 else f"{value}/128"
-
-
-async def fetch_public_ip() -> str:
-    async with aiohttp.ClientSession() as session:
-        async with session.get("https://api.ipify.org?format=json") as resp:
-            return (await resp.json())["ip"]
-
-
-class EC2Service:
-    @staticmethod
-    async def list_instances() -> list[dict]:
-        raw = await run_cmd(
-            "aws ec2 describe-instances --output json",
-            "Loading EC2 instances",
-        )
-        data = loads(raw)
-        return [
-            instance
-            for reservation in data.get("Reservations", [])
-            for instance in reservation.get("Instances", [])
-        ]
-
-    @staticmethod
-    def instance_name(instance: dict) -> str:
-        for tag in instance.get("Tags", []):
-            if tag.get("Key") == "Name":
-                return tag.get("Value", "")
-        return ""
-
-    @classmethod
-    def resolve_many(
-        cls,
-        instances: list[dict],
-        *,
-        instance_id: Optional[str],
-        instance_name: Optional[str],
-    ) -> list[dict]:
-        if instance_id:
-            matches = [i for i in instances if i["InstanceId"] == instance_id]
-        elif instance_name:
-            matches = [i for i in instances if cls.instance_name(i) == instance_name]
-        else:
-            # no filter → all instances
-            matches = instances
-
-        if not matches:
-            raise RuntimeError("No instances matched")
-
-        return matches
-
-
-class SecurityGroupService:
-    @staticmethod
-    async def list_rules() -> list[dict]:
-        raw = await run_cmd(
-            "aws ec2 describe-security-group-rules --output json",
-            "Loading security group rules",
-        )
-        return loads(raw)["SecurityGroupRules"]
-
-
-class SSHRuleUpdater:
-    def __init__(self, instance: dict, ssh_port: int, source_ip: str):
-        self.instance = instance
-        self.port = ssh_port
-        self.source_cidr = normalize_ip(source_ip)
-        self.sg_ids = {sg["GroupId"] for sg in instance["SecurityGroups"]}
-
-    def _is_matching_ssh_rule(self, rule: dict) -> bool:
-        return (
-            rule["GroupId"] in self.sg_ids
-            and not rule["IsEgress"]
-            and rule["IpProtocol"] == "tcp"
-            and rule["FromPort"] == self.port
-            and rule["ToPort"] == self.port
-        )
-
-    async def update(self, rules: list[dict]):
-        ssh_rules = [r for r in rules if self._is_matching_ssh_rule(r)]
-
-        if not ssh_rules:
-            print(f"  No SSH ingress rules found for port {self.port}.")
-            return
-
-        for rule in ssh_rules:
-            if rule.get("CidrIpv4") == self.source_cidr:
-                print(f"  Skipping {rule['SecurityGroupRuleId']} (already correct)")
-                continue
-
-            payload = {
-                "SecurityGroupRuleId": rule["SecurityGroupRuleId"],
-                "SecurityGroupRule": {
-                    "IpProtocol": "tcp",
-                    "FromPort": self.port,
-                    "ToPort": self.port,
-                    "CidrIpv4": self.source_cidr,
-                },
-            }
-
-            cmd = (
-                "aws ec2 modify-security-group-rules "
-                f"--group-id {rule['GroupId']} "
-                f"--security-group-rules '{dumps([payload])}'"
-            )
-
-            await run_cmd(cmd, f"  Updating {rule['SecurityGroupRuleId']}")
-            print(f"  Updated → {self.source_cidr}")
-
-
-def parse_args() -> argparse.Namespace:
-    __VERSION = "AWS-ACCESS-RENEWER 1.0.2"
-    parser = argparse.ArgumentParser(
-        description="""
-Automatically update AWS EC2 security group SSH rules to allow access from your current IP address.
-If no instance is specified, lists all instances and prompts for confirmation to update all.
-        """.strip(
-            "\n"
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Example: python main.py -n my-instance --ssh-port 2222",
-        prog="aws-access-renewer",
-        usage="%(prog)s [options]",
-    )
-    parser.add_argument(
-        "-i", "--instance-id", help="EC2 instance ID", dest="instance_id"
-    )
-    parser.add_argument(
-        "-n", "--instance-name", help="EC2 instance Name tag", dest="instance_name"
-    )
-    parser.add_argument(
-        "-p",
-        "--ssh-port",
-        type=int,
-        default=22,
-        help="SSH port to update (default: 22)",
-        dest="ssh_port",
-    )
-    parser.add_argument(
-        "--source-ip", help="IP or CIDR (auto-detected if omitted)", dest="source_ip"
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=__VERSION,
-        help="Show program version and exit",
-    )
-    parser.add_argument(
-        "-b",
-        "--batch",
-        action="store_true",
-        help="Run in batch mode without prompts",
-        default=False,
-    )
-    return parser.parse_args()
-
+from aws_access_renewer.cli import parse_args
+from aws_access_renewer.core.network import fetch_public_ip
+from aws_access_renewer.core.aws import EC2Service, SecurityGroupService
+from aws_access_renewer.core.updater import SSHRuleUpdater
+from aws_access_renewer.ui.orchestrator import OrchestratorUI
 
 async def main():
     args = parse_args()
+    ui = OrchestratorUI(version="1.7.0")
+    
+    ui.show_header()
 
-    instances = await EC2Service.list_instances()
-    targets = EC2Service.resolve_many(
-        instances,
-        instance_id=args.instance_id,
-        instance_name=args.instance_name,
-    )
+    try:
+        # 1. Environment Discovery
+        src_ip = args.source_ip or await fetch_public_ip()
+        
+        regions = [None]
+        if args.regions:
+            if args.regions.lower() == "all":
+                regions = await EC2Service(profile=args.profile).list_regions()
+            else: 
+                regions = [r.strip() for r in args.regions.split(",")]
+        
+        ui.show_env(src_ip, len(regions))
 
-    if not args.instance_id and not args.instance_name:
-        print("Instances:")
-        for instance in targets:
-            name = EC2Service.instance_name(instance)
-            print(f"  {instance['InstanceId']} ({name})")
-        print()
+        # 2. Resource Scanning
+        instances_by_region = {}
+        all_instances = []
+        
+        with ui.console.status("[info]SCANNING_INFRASTRUCTURE...[/]"):
+            for r in regions:
+                try:
+                    svc = EC2Service(profile=args.profile, region=r)
+                    insts = await svc.list_instances()
+                    matches = [i for i in insts if not (args.instance_id or args.instance_name) or 
+                               (i["InstanceId"] == args.instance_id or 
+                                 EC2Service.instance_name(i) == args.instance_name)]
+                    if matches:
+                        instances_by_region[r] = matches
+                        for m in matches: 
+                            m["_region"] = r
+                        all_instances.extend(matches)
+                except Exception as e:
+                    ui.console.print(f"[danger]✘[/] REGION_ERROR [{r or 'default'}]: {e}")
 
-        if not args.batch:
-            if (
-                add_input := input(
-                    "Enter 'all' to proceed with all instances, instance ID to proceed with that instance, or anything else to abort: "
-                )
-                .strip()
-                .lower()
-            ) == "all":
-                pass
-            elif any(instance["InstanceId"] == add_input for instance in targets):
-                targets = [
-                    instance
-                    for instance in targets
-                    if instance["InstanceId"] == add_input
-                ]
-            else:
-                print("Aborted.")
+        if not all_instances:
+            ui.console.print("\n[warning]  NO_TARGETS_FOUND [/]\n")
+            return
+
+        ui.show_discovery_tree(instances_by_region)
+
+        # 3. Interactive Selection
+        if args.batch:
+            selected = all_instances
+        else:
+            selected = await ui.interactive_select(all_instances)
+            
+            if not selected:
+                ui.console.print("\n[warning]  ABORTED: NO_RESOURCES_SELECTED [/]\n")
                 return
 
-    source_ip = args.source_ip or await fetch_public_ip()
-    print(f"Using source IP: {source_ip}\n")
+        # 4. Orchestrated Execution
+        ui.console.print("[bold info]  EXECUTION_START [/]")
+        tasks = {inst["InstanceId"]: {
+            "id": inst["InstanceId"], 
+            "name": EC2Service.instance_name(inst), 
+            "status": "pending", 
+            "msg": "Waiting..."
+        } for inst in selected}
+        
+        stats = {"success": 0, "skipped": 0, "error": 0}
 
-    rules = await SecurityGroupService.list_rules()
+        with Live(ui.create_task_group(tasks), console=ui.console, refresh_per_second=10) as live:
+            for inst in selected:
+                tid = inst["InstanceId"]
+                tasks[tid]["status"] = "running"
+                tasks[tid]["msg"] = "Synchronizing..."
+                live.update(ui.create_task_group(tasks))
 
-    for instance in targets:
-        print(
-            f"Instance: {instance['InstanceId']} ({EC2Service.instance_name(instance)})"
-        )
+                try:
+                    region = inst["_region"]
+                    updater = SSHRuleUpdater(
+                        inst, args.ssh_port, src_ip, args.profile, region, 
+                        args.dry_run, args.cleanup
+                    )
+                    sg_service = SecurityGroupService(args.profile, region)
+                    rules = await sg_service.list_rules()
+                    res = await updater.update(rules)
+                    
+                    if res["updated"] > 0:
+                        tasks[tid]["status"] = "success"
+                        tasks[tid]["msg"] = f"Updated {res['updated']} rule(s)"
+                        stats["success"] += 1
+                    elif res["skipped"] > 0:
+                        tasks[tid]["status"] = "skipped"
+                        tasks[tid]["msg"] = "Already up-to-date"
+                        stats["skipped"] += 1
+                    else:
+                        tasks[tid]["status"] = "skipped"
+                        tasks[tid]["msg"] = "No matching rules"
+                        stats["skipped"] += 1
+                except Exception as e:
+                    tasks[tid]["status"] = "error"
+                    tasks[tid]["msg"] = str(e)
+                    stats["error"] += 1
+                
+                live.update(ui.create_task_group(tasks))
 
-        updater = SSHRuleUpdater(
-            instance=instance,
-            ssh_port=args.ssh_port,
-            source_ip=source_ip,
-        )
-        await updater.update(rules)
-        print()
+        # 5. Final Report
+        ui.show_summary(stats)
 
-    print("Done.")
-
+    except Exception as e:
+        ui.console.print(f"\n[bold danger]FATAL ERROR:[/] {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            asyncio.ensure_future(main())
+        else:
+            asyncio.run(main())
     except KeyboardInterrupt:
-        print("\nCancelled.")
+        print("\n[warning]Operation cancelled.[/]")
+        sys.exit(130)
